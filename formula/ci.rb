@@ -1,8 +1,8 @@
 class Ci < Formula
   desc "Console utility for building with Jenkins"
   homepage "https://github.com/insanehunter/ci"
-  url "https://github.com/insanehunter/ci/archive/v0.0.1.tar.gz"
-  sha256 "12c2801e129d70e5466433ed0b692f0941d632fc67481a92ec9b92f365a99f06"
+  url "https://github.com/insanehunter/ci/archive/v0.0.2.tar.gz"
+  sha256 "894205b4ab171f933ffbcd31a1513074413347d0deba8528fb6afe922bdd050b"
 
   def install
     bin.install "ci"
