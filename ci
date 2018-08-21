@@ -36,9 +36,22 @@ function run() {
     echo "Building $JOB_NAME: $@"
 
     JENKINS_CRUMB=$(curl -s --user $JENKINS_CREDENTIALS "$JENKINS_URL/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,\":\",//crumb)")
-    curl -s -X POST $JENKINS_URL/job/$JOB_NAME/build --user $JENKINS_CREDENTIALS --data-urlencode \
-            json="{\"parameter\": [$PARAMS]}" \
-            -H $JENKINS_CRUMB
+    curl -s -X POST $JENKINS_URL/job/$JOB_NAME/build --user $JENKINS_CREDENTIALS \
+         --data-urlencode json="{\"parameter\": [$PARAMS]}" -H $JENKINS_CRUMB
+
+    RESULT="null"
+    while [ $RESULT = "null" ]; do
+        sleep 1
+        LOG=`curl -s $JENKINS_URL/job/$JOB_NAME/lastBuild/api/json --user $JENKINS_CREDENTIALS \
+                  -H $JENKINS_CRUMB`
+        RESULT=`echo $LOG | jq -r '.result'`
+        printf "."
+    done
+    echo "Done: $RESULT"
+    if [ $RESULT != "SUCCESS" ]; then
+        URL=$(echo $LOG | jq -r '.url')
+        echo "Details here: ${URL%/}/console"
+    fi
 }
 
 function createConfig() {
