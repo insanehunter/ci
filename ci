@@ -1,0 +1,76 @@
+#!/bin/sh
+set -e
+
+CONFIG="$HOME/.config/ci"
+
+# TODO:
+# .ci and ci init - local configuration file with jenkins url, job name and params
+# automatic branch detection
+# checking if branch was not pushed or has local changes
+#
+
+function usage() {
+    echo "Usage:"
+    echo "    ci JOB_NAME [PARAM=VALUE] - builds job with optional parameters"
+}
+
+function run() {
+    if [[ $# < 1 ]]; then
+        usage
+        return
+    fi
+    source $CONFIG
+
+    JOB_NAME=$1
+    shift 1
+
+    PARAMS=""
+    for arg in $@; do
+        NAME=${arg%=*}
+        VALUE=${arg##*=}
+        if [ "$PARAMS" ]; then
+            PARAMS+=","
+        fi
+        PARAMS+="{\"name\":\"$NAME\", \"value\":\"$VALUE\"}"
+    done
+    echo "Building $JOB_NAME: $@"
+
+    JENKINS_CRUMB=$(curl -s --user $JENKINS_CREDENTIALS "$JENKINS_URL/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,\":\",//crumb)")
+    curl -s -X POST $JENKINS_URL/job/$JOB_NAME/build --user $JENKINS_CREDENTIALS --data-urlencode \
+            json="{\"parameter\": [$PARAMS]}" \
+            -H $JENKINS_CRUMB
+}
+
+function createConfig() {
+    echo "Please answer few questions:\n"
+    read -p $'What is your Jenkins URL? (e.g. http://jenkins.org)\n' JENKINS_URL
+    read -p "Username: " JENKINS_LOGIN
+    read -p "Password: " -s JENKINS_PASSWORD
+    echo "\nValidating..."
+
+    JENKINS_CREDENTIALS="$JENKINS_LOGIN:$JENKINS_PASSWORD"
+    set -x +e
+    curl -v -s --user $JENKINS_CREDENTIALS "$JENKINS_URL/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,\":\",//crumb)"
+    RESULT=$?
+    set +x -e
+    if [ ! $RESULT = 0 ]; then
+        echo "\nOh no! Let's try again."
+        createConfig
+        return
+    fi
+
+    echo "Success!"
+
+    cat > $CONFIG <<-EOM
+JENKINS_URL='$JENKINS_URL'
+JENKINS_CREDENTIALS='$JENKINS_LOGIN:$JENKINS_PASSWORD'
+EOM
+    echo "Your config has been saved at $CONFIG"
+}
+
+if [ -f $CONFIG ]; then
+    run $@
+else
+    echo "No configuration file found at $CONFIG"
+    createConfig
+fi
