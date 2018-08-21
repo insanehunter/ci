@@ -42,14 +42,14 @@ function run() {
     RESULT="null"
     while [ $RESULT = "null" ]; do
         sleep 1
-        LOG=`curl -s $JENKINS_URL/job/$JOB_NAME/lastBuild/api/json --user $JENKINS_CREDENTIALS \
-                  -H $JENKINS_CRUMB`
+        curl -s $JENKINS_URL/job/$JOB_NAME/lastBuild/api/json --user $JENKINS_CREDENTIALS \
+             -H $JENKINS_CRUMB
         RESULT=`echo $LOG | jq -r '.result'`
         printf "."
     done
     echo "Done: $RESULT"
     if [ $RESULT != "SUCCESS" ]; then
-        URL=$(echo $LOG | jq -r '.url')
+        URL=$(echo $LOG | tr -d '\n' | jq -r '.url')
         echo "Details here: ${URL%/}/console"
     fi
 }
