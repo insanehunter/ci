@@ -14,26 +14,44 @@ CI_FILE="./.ci"
 if [ -t 1 ]; then
     NCOLORS=`tput colors`
 
-    if [ -n "$NCOLORS" ] &&  [ $NCOLORS -ge 8 ]; then
+    if [ -n "$NCOLORS" ] && [ $NCOLORS -ge 8 ]; then
         NORMAL=`tput sgr0`
         RED=`tput setaf 1`
         GREEN=`tput setaf 2`
         YELLOW=`tput setaf 3`
-        BLUE="$(tput setaf 4)"
-        UNDERLINE="$(tput smul)"
+        BLUE=`tput setaf 4`
+        BOLD=`tput bold`
+        UNDERLINE=`tput smul`
     fi
 fi
 
 function usage() {
     echo "Usage:"
-    echo "    ci JOB_NAME [PARAM=VALUE] - builds job with optional parameters"
+    echo "    ci [-f] JOB_NAME [PARAM=VALUE] - builds job with optional parameters"
+    echo
+    echo "    Flags:"
+    echo "        -f: force build even if current branch has unpushed commits"
+    echo
 }
 
 function run() {
+    FORCE=0
+    if [ "$1" = "-f" ]; then
+        FORCE=1
+        shift 1
+    fi
+
     if [ -f $CI_FILE ]; then
-        echo 'Using .ci file.'
+        echo 'Using .ci file.\n'
 
         BRANCH=`git symbolic-ref --short HEAD`
+        UPSTREAM=`git for-each-ref --format="%(upstream)" "refs/heads/$BRANCH"`
+
+        if [ $FORCE -ne 1 ] && ([ -z "$UPSTREAM" ] || [ ! -z "$(git cherry -v)" ]); then
+            echo "${YELLOW}Refusing to build: local branch "$BRANCH" has unpushed commits${NORMAL}"
+            exit 1
+        fi
+
         read -a ARGS < $CI_FILE
         set -- `eval echo ${ARGS[@]}`
     fi
@@ -48,15 +66,21 @@ function run() {
     shift 1
 
     PARAMS=""
+    HUMAN_PARAMS="\n"
     for arg in $@; do
         NAME=${arg%=*}
         VALUE=${arg##*=}
+        if [ -z "$VALUE" ]; then
+            echo "${RED}Error: no value provided for parameter $NAME${NORMAL}"
+            exit 1
+        fi
         if [ "$PARAMS" ]; then
             PARAMS+=","
         fi
         PARAMS+="{\"name\":\"$NAME\", \"value\":\"$VALUE\"}"
+        HUMAN_PARAMS+="    ${BOLD}$NAME${NORMAL}=$VALUE\n"
     done
-    echo "Building ${YELLOW}$JOB_NAME${NORMAL}: $@"
+    echo "Building ${BOLD}$JOB_NAME${NORMAL}: $HUMAN_PARAMS"
 
     JENKINS_CRUMB=$(curl -s --user $JENKINS_CREDENTIALS "$JENKINS_URL/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,\":\",//crumb)")
     RESULT_FILE=`mktemp`
