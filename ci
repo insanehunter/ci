@@ -2,6 +2,7 @@
 set -e
 
 CONFIG="$HOME/.config/ci"
+CI_FILE="./.ci"
 
 # TODO:
 # .ci and ci init - local configuration file with jenkins url, job name and params
@@ -29,7 +30,15 @@ function usage() {
 }
 
 function run() {
-    if [[ $# < 1 ]]; then
+    if [ -f $CI_FILE ]; then
+        echo 'Using .ci file.'
+
+        BRANCH=`git symbolic-ref --short HEAD`
+        read -a ARGS < $CI_FILE
+        set -- `eval echo ${ARGS[@]}`
+    fi
+
+    if [ $# -lt 1 ]; then
         usage
         return
     fi
@@ -54,7 +63,7 @@ function run() {
     curl -s -X POST $JENKINS_URL/job/$JOB_NAME/build --user $JENKINS_CREDENTIALS \
                    --data-urlencode json="{\"parameter\": [$PARAMS]}" -H $JENKINS_CRUMB > $RESULT_FILE
     if [ ! -z "$(cat $RESULT_FILE)" ]; then
-        ERROR=`cat $RESULT_FILE | pup '#error-description pre text{}' | head -n1 | sed 's/[a-zA-Z.]*: //'`
+        ERROR=`cat $RESULT_FILE | pup 'pre text{}' | head -n1 | sed 's/[a-zA-Z.]*: //; s/ *\(.*\) */\1/'`
         echo "${RED}FAIL${NORMAL}: ${RED}$ERROR${NORMAL}"
         rm $RESULT_FILE
         exit 1
@@ -93,23 +102,23 @@ function createConfig() {
     RESULT=$?
     set +x -e
     if [ ! $RESULT = 0 ]; then
-        echo "\nOh no! Let's try again."
+        echo "\n${RED}Oh no! Let's try again.${NORMAL}"
         createConfig
         return
     fi
 
-    echo "Success!"
+    echo "${GREEN}Success!${NORMAL}"
 
     cat > $CONFIG <<-EOM
 JENKINS_URL='$JENKINS_URL'
 JENKINS_CREDENTIALS='$JENKINS_LOGIN:$JENKINS_PASSWORD'
 EOM
-    echo "Your config has been saved at $CONFIG"
+    echo "${GREEN}Your config has been saved at $CONFIG${NORMAL}"
 }
 
 if [ -f $CONFIG ]; then
     run $@
 else
-    echo "No configuration file found at $CONFIG"
+    echo "${YELLOW}No configuration file found at $CONFIG${NORMAL}"
     createConfig
 fi
