@@ -5,6 +5,7 @@ class Ci < Formula
   sha256 "894205b4ab171f933ffbcd31a1513074413347d0deba8528fb6afe922bdd050b"
 
   depends_on "jq"
+  depends_on "pup"
 
   def install
     bin.install "ci"

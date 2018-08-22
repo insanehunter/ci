@@ -9,6 +9,20 @@ CONFIG="$HOME/.config/ci"
 # checking if branch was not pushed or has local changes
 #
 
+# Defining colors.
+if [ -t 1 ]; then
+    NCOLORS=`tput colors`
+
+    if [ -n "$NCOLORS" ] &&  [ $NCOLORS -ge 8 ]; then
+        NORMAL=`tput sgr0`
+        RED=`tput setaf 1`
+        GREEN=`tput setaf 2`
+        YELLOW=`tput setaf 3`
+        BLUE="$(tput setaf 4)"
+        UNDERLINE="$(tput smul)"
+    fi
+fi
+
 function usage() {
     echo "Usage:"
     echo "    ci JOB_NAME [PARAM=VALUE] - builds job with optional parameters"
@@ -33,24 +47,36 @@ function run() {
         fi
         PARAMS+="{\"name\":\"$NAME\", \"value\":\"$VALUE\"}"
     done
-    echo "Building $JOB_NAME: $@"
+    echo "Building ${YELLOW}$JOB_NAME${NORMAL}: $@"
 
     JENKINS_CRUMB=$(curl -s --user $JENKINS_CREDENTIALS "$JENKINS_URL/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,\":\",//crumb)")
+    RESULT_FILE=`mktemp`
     curl -s -X POST $JENKINS_URL/job/$JOB_NAME/build --user $JENKINS_CREDENTIALS \
-         --data-urlencode json="{\"parameter\": [$PARAMS]}" -H $JENKINS_CRUMB
+                   --data-urlencode json="{\"parameter\": [$PARAMS]}" -H $JENKINS_CRUMB > $RESULT_FILE
+    if [ ! -z "$(cat $RESULT_FILE)" ]; then
+        ERROR=`cat $RESULT_FILE | pup '#error-description pre text{}' | head -n1 | sed 's/[a-zA-Z.]*: //'`
+        echo "${RED}FAIL${NORMAL}: ${RED}$ERROR${NORMAL}"
+        rm $RESULT_FILE
+        exit 1
+    fi
+    rm $RESULT_FILE
 
     RESULT="null"
-    while [ $RESULT = "null" ]; do
+    while [ "$RESULT" = "null" ]; do
         sleep 1
-        curl -s $JENKINS_URL/job/$JOB_NAME/lastBuild/api/json --user $JENKINS_CREDENTIALS \
-             -H $JENKINS_CRUMB
-        RESULT=`echo $LOG | jq -r '.result'`
+        LOG=`curl -s $JENKINS_URL/job/$JOB_NAME/lastBuild/api/json --user $JENKINS_CREDENTIALS \
+                  -H $JENKINS_CRUMB`
+        RESULT=`echo $LOG | tr -d '\n' | jq -r '.result'`
         printf "."
     done
-    echo "Done: $RESULT"
-    if [ $RESULT != "SUCCESS" ]; then
+    if [ "$RESULT" != "SUCCESS" ]; then
+        echo "${RED}$RESULT${NORMAL}"
         URL=$(echo $LOG | tr -d '\n' | jq -r '.url')
-        echo "Details here: ${URL%/}/console"
+        if [ ! -z "$URL" ]; then
+            echo "More info here: ${BLUE}${UNDERLINE}${URL%/}/console${NORMAL}"
+        fi
+    else
+        echo "${GREEN}SUCCESS${NORMAL}"
     fi
 }
 
