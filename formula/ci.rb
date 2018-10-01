@@ -1,8 +1,8 @@
 class Ci < Formula
   desc "Console utility for building with Jenkins"
   homepage "https://github.com/insanehunter/ci"
-  url "https://github.com/insanehunter/ci/archive/v0.0.4.tar.gz"
-  sha256 "50f9f88b89bd965a0e3edb853eea36e2131ffc4d8a73f00d18b7d205526bf2bd"
+  url "https://github.com/insanehunter/ci/archive/0.0.5.tar.gz"
+  sha256 "6f05cd049a130dae120c9436aa48b5e5a82f1aa736d5e564e4c933b2dfb9ee36"
 
   depends_on "jq"
   depends_on "pup"
