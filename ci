@@ -96,6 +96,14 @@ function run() {
     fi
     rm $RESULT_FILE
 
+    trap ctrl_c INT
+    function ctrl_c() {
+        echo "** Stopping job"
+        curl -s -X POST $JENKINS_URL/job/$JOB_NAME/lastBuild/stop --user $JENKINS_CREDENTIALS \
+                -H $JENKINS_CRUMB
+        echo "${RED}CANCELLED${NORMAL}"
+    }
+
     RESULT="null"
     while [ "$RESULT" = "null" ]; do
         sleep 1
@@ -113,6 +121,8 @@ function run() {
     else
         echo "${GREEN}SUCCESS${NORMAL}"
     fi
+
+    trap - INT
 }
 
 function createConfig() {
