@@ -1,6 +1,7 @@
 #!/bin/sh
 set -e
 
+VERSION=0.0.5
 CONFIG="$HOME/.config/ci"
 CI_FILE="./.ci"
 
@@ -26,6 +27,7 @@ if [ -t 1 ]; then
 fi
 
 function usage() {
+    echo "ci $VERSION"
     echo "Usage:"
     echo "    ci [-f] JOB_NAME [PARAM=VALUE] - builds job with optional parameters"
     echo
@@ -139,6 +141,20 @@ JENKINS_CREDENTIALS='$JENKINS_LOGIN:$JENKINS_PASSWORD'
 EOM
     echo "${GREEN}Your config has been saved at $CONFIG${NORMAL}"
 }
+
+echo "Checking for update"
+LATEST_VERSION=$(curl -s https://raw.githubusercontent.com/insanehunter/ci/master/latest-version)
+if [ $VERSION != $LATEST_VERSION ]; then
+    echo Update available.
+    echo Updating to $LATEST_VERSION.
+    if [ ! -x $(which brew) ]; then
+        ""
+        exit 1
+    fi
+    brew reinstall https://raw.githubusercontent.com/insanehunter/ci/master/formula/ci.rb
+    ci $*
+    exit
+fi
 
 if [ -f $CONFIG ]; then
     run $@
